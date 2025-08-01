@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Matrix Glowing Cubes</title>
+    <style>
+        body { 
+            margin: 0; 
+            background-color: #000; 
+            overflow: hidden; 
+        }
+    </style>
+</head>
+<body>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+    <script type="module">
+        // Import THREE and post-processing modules
+        import * as THREE from 'three';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+        // Scene, camera, renderer
+        let scene, camera, renderer, composer;
+        let group;
+        const cubes = [];
+
+        // Bloom parameters
+        const params = {
+            bloomThreshold: 0,
+            bloomStrength: 1.0,
+            bloomRadius: 0.4
+        };
+
+        function init() {
+            // Basic setup
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 35;
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            // Cube group
+            group = new THREE.Group();
+            scene.add(group);
+
+            // Create cubes in a grid to form a larger cube
+            const geometry = new THREE.BoxGeometry(1.5, 1.5, 1.5);
+            const gridSize = 8;
+            const spacing = 2.5;
+            for (let x = 0; x < gridSize; x++) {
+                for (let y = 0; y < gridSize; y++) {
+                    for (let z = 0; z < gridSize; z++) {
+                        const material = new THREE.MeshBasicMaterial({
+                            color: 0x00ff00,
+                            wireframe: true
+                        });
+                        const cube = new THREE.Mesh(geometry, material);
+                        cube.position.set(
+                            (x - gridSize / 2) * spacing,
+                            (y - gridSize / 2) * spacing,
+                            (z - gridSize / 2) * spacing
+                        );
+                        // Store individual rotation speeds
+                        cube.userData.rotationSpeed = new THREE.Vector3(
+                            Math.random() * 0.01,
+                            Math.random() * 0.01,
+                            Math.random() * 0.01
+                        );
+                        group.add(cube);
+                        cubes.push(cube);
+                    }
+                }
+            }
+
+            // Post-processing (Bloom effect)
+            const renderPass = new RenderPass(scene, camera);
+            const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), params.bloomStrength, params.bloomRadius, params.bloomThreshold);
+            const outputPass = new OutputPass();
+
+            composer = new EffectComposer(renderer);
+            composer.addPass(renderPass);
+            composer.addPass(bloomPass);
+            composer.addPass(outputPass);
+
+            // Event listeners
+            window.addEventListener('resize', onWindowResize);
+
+            animate();
+        }
+
+        function onWindowResize() {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+            composer.setSize(width, height);
+        }
+        
+        let glowingCube = null;
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Rotate the entire group
+            group.rotation.x += 0.002;
+            group.rotation.y += 0.003;
+
+            // Rotate individual cubes
+            cubes.forEach(cube => {
+                cube.rotation.x += cube.userData.rotationSpeed.x;
+                cube.rotation.y += cube.userData.rotationSpeed.y;
+                cube.rotation.z += cube.userData.rotationSpeed.z;
+            });
+
+            // Make a random cube "glow"
+            if (Math.random() > 0.98 && !glowingCube) { // 2% chance each frame to start glowing
+                const index = Math.floor(Math.random() * cubes.length);
+                glowingCube = cubes[index];
+                glowingCube.material.color.set(0xffffff); // Make it white to bloom brightly
+            }
+            
+            if (Math.random() > 0.95 && glowingCube) { // 5% chance to stop glowing
+                 glowingCube.material.color.set(0x00ff00); // Reset to default green
+                 glowingCube = null;
+            }
+
+
+            // Render scene with post-processing
+            composer.render();
+        }
+
+        init();
+    </script>
+</body>
+</html>
